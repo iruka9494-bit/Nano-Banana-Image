@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, ShieldCheck, Zap, RefreshCw, ExternalLink, ShieldAlert, CheckCircle2, ChevronRight, HardDrive, Lock, Activity } from 'lucide-react';
+import { X, ShieldCheck, Zap, RefreshCw, ExternalLink, ShieldAlert, CheckCircle2, ChevronRight, HardDrive, Lock, Activity, Key } from 'lucide-react';
 import { testApiKeyConnection } from '../services/geminiService';
 
 interface KeyManagerModalProps {
@@ -12,16 +12,33 @@ export const KeyManagerModal: React.FC<KeyManagerModalProps> = ({ onClose, onKey
   const [testResult, setTestResult] = useState<{ success: boolean; message: string; details?: string; latency?: number } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [showDiagnosticPopup, setShowDiagnosticPopup] = useState(false);
+  const [manualKey, setManualKey] = useState('');
+  const [isManualMode, setIsManualMode] = useState(false);
 
   const handleOpenSelect = async () => {
-    try {
-      // 플래폼 API를 사용하여 로컬 드라이브/브라우저 보안 영역에 키를 암호화하여 저장
-      await (window as any).aistudio.openSelectKey();
-      onKeyChange(); // 키 변경 상태 알림
-      setTestResult(null); 
-    } catch (e) {
-      console.error(e);
+    if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
+      try {
+        await window.aistudio.openSelectKey();
+        onKeyChange();
+        setTestResult(null); 
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      setIsManualMode(true);
     }
+  };
+
+  const handleManualSave = () => {
+    if (manualKey.length < 10) {
+      alert("올바른 형식이 아닙니다.");
+      return;
+    }
+    localStorage.setItem('USER_PROVIDED_API_KEY', manualKey);
+    (process.env as any).API_KEY = manualKey;
+    onKeyChange();
+    setIsManualMode(false);
+    alert("API 키가 성공적으로 업데이트되었습니다.");
   };
 
   const runDiagnostic = async () => {
@@ -68,51 +85,70 @@ export const KeyManagerModal: React.FC<KeyManagerModalProps> = ({ onClose, onKey
                   <span className="text-xs font-bold uppercase tracking-wider">로컬 보안 저장소</span>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  API 키는 플랫폼 표준에 따라 로컬 드라이브의 암호화된 볼트에 저장됩니다. 앱 소스코드나 서버에는 절대로 저장되지 않습니다.
+                  API 키는 플랫폼 표준 또는 로컬 암호화 저장소에 저장됩니다. 앱 서버에는 절대로 저장되지 않습니다.
                 </p>
               </div>
               <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-5 space-y-3">
                 <div className="flex items-center gap-2 text-blue-400">
                   <Lock className="w-4 h-4" />
-                  <span className="text-xs font-bold uppercase tracking-wider">암호화 및 격리</span>
+                  <span className="text-xs font-bold uppercase tracking-wider">데이터 보호</span>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  AES-256 규격 암호화가 적용되어 있으며, 세션 활성화 시에만 환경 변수로 안전하게 전달됩니다.
+                  로컬 환경에 격리되어 관리되며, API 호출 시에만 안전한 채널을 통해 전달됩니다.
                 </p>
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="space-y-3">
-              <button 
-                onClick={handleOpenSelect}
-                className="w-full group flex items-center justify-between p-5 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-2xl transition-all"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-banana-500/10 rounded-lg group-hover:scale-110 transition-transform">
-                    <RefreshCw className="w-5 h-5 text-banana-500" />
+            {/* Manual Edit Mode */}
+            {isManualMode ? (
+              <div className="space-y-4 animate-fade-in bg-slate-950 p-6 rounded-2xl border border-slate-800 shadow-inner">
+                 <div className="flex items-center gap-2 text-banana-400 text-xs font-bold uppercase mb-2">
+                    <Key className="w-4 h-4" /> 수동 키 등록
+                 </div>
+                 <input 
+                    type="password"
+                    value={manualKey}
+                    onChange={(e) => setManualKey(e.target.value)}
+                    placeholder="새로운 API 키를 입력하세요"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:border-banana-500 outline-none"
+                 />
+                 <div className="flex gap-2">
+                    <button onClick={() => setIsManualMode(false)} className="flex-1 py-3 text-xs text-slate-400 hover:text-white transition-colors">취소</button>
+                    <button onClick={handleManualSave} className="flex-[2] py-3 bg-banana-500 text-slate-950 font-bold rounded-xl text-xs">저장 및 업데이트</button>
+                 </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <button 
+                  onClick={handleOpenSelect}
+                  className="w-full group flex items-center justify-between p-5 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-2xl transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 bg-banana-500/10 rounded-lg group-hover:scale-110 transition-transform">
+                      <RefreshCw className="w-5 h-5 text-banana-500" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-bold text-white">API 키 연결 및 갱신</p>
+                      <p className="text-xs text-slate-500">{window.aistudio ? '플랫폼 키 선택기 실행' : '수동 키 관리 (BYOK)'}</p>
+                    </div>
                   </div>
-                  <div className="text-left">
-                    <p className="text-sm font-bold text-white">외부 API 키 연결 및 갱신</p>
-                    <p className="text-xs text-slate-500">로컬 암호화 저장소에 키 등록</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-5 h-5 text-slate-600 group-hover:translate-x-1 transition-transform" />
-              </button>
+                  <ChevronRight className="w-5 h-5 text-slate-600 group-hover:translate-x-1 transition-transform" />
+                </button>
 
-              <button 
-                onClick={runDiagnostic}
-                disabled={isTesting}
-                className={`w-full flex items-center justify-center p-5 rounded-2xl font-bold transition-all gap-3 shadow-xl ${
-                  isTesting 
-                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed' 
-                  : 'bg-gradient-to-r from-banana-500 to-orange-500 text-slate-950 hover:shadow-banana-500/20 active:scale-[0.98]'
-                }`}
-              >
-                {isTesting ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
-                연결 테스트 및 실시간 진단
-              </button>
-            </div>
+                <button 
+                  onClick={runDiagnostic}
+                  disabled={isTesting}
+                  className={`w-full flex items-center justify-center p-5 rounded-2xl font-bold transition-all gap-3 shadow-xl ${
+                    isTesting 
+                    ? 'bg-slate-800 text-slate-500 cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-banana-500 to-orange-500 text-slate-950 hover:shadow-banana-500/20 active:scale-[0.98]'
+                  }`}
+                >
+                  {isTesting ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
+                  연결 테스트 및 실시간 진단
+                </button>
+              </div>
+            )}
 
             {/* Footer */}
             <div className="pt-2 text-center">

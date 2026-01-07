@@ -44,14 +44,32 @@ const App: React.FC = () => {
     referenceImages: []
   });
 
-  // 초기 키 체크
+  // 초기 키 체크 및 로컬 저장소 동기화
   useEffect(() => {
     const checkInitialKey = async () => {
+      // 1. 환경 변수 확인 (Vercel 배포 시 설정된 키)
+      if (process.env.API_KEY && process.env.API_KEY.length > 5) {
+        setHasApiKey(true);
+        return;
+      }
+
+      // 2. 로컬 스토리지 확인 (사용자가 직접 입력한 키)
+      const savedKey = localStorage.getItem('USER_PROVIDED_API_KEY');
+      if (savedKey) {
+        // SDK가 사용할 수 있도록 환경 변수 객체에 주입 (BYOK 모드)
+        (process.env as any).API_KEY = savedKey;
+        setHasApiKey(true);
+        return;
+      }
+
+      // 3. AI Studio 플랫폼 API 확인
       try {
-        const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-        setHasApiKey(hasKey);
+        if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
+          const hasKey = await window.aistudio.hasSelectedApiKey();
+          setHasApiKey(hasKey);
+        }
       } catch (e) {
-        console.error("API Key check error", e);
+        console.warn("AI Studio API check skipped:", e);
       }
     };
     checkInitialKey();
@@ -84,7 +102,7 @@ const App: React.FC = () => {
           code: '403 Forbidden',
           title: '인증 권한 오류',
           message: '유효하지 않은 API 키이거나 해당 프로젝트에 결제가 활성화되어 있지 않습니다.',
-          suggestion: '보안 관리 센터에서 진단을 수행하거나 키를 다시 연결해 주세요.'
+          suggestion: '보안 관리 센터에서 진단을 수행하거나 키를 다시 등록해 주세요.'
         };
       } else if (msg.includes('429')) {
         details = { code: '429', title: '사용량 한도 초과', message: '단시간에 너무 많은 요청을 보냈습니다.', suggestion: '잠시 후 다시 시도해 주세요.' };
