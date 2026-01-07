@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Nano Banana Pro Studio</title>
     <script>
-      // 브라우저에서 process.env 참조 에러(ReferenceError)를 방지하는 근본 대책
+      // 브라우저에서 process.env 참조 에러를 방지하기 위한 폴리필
       window.process = window.process || { env: {} };
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -27,27 +27,26 @@
                 800: '#854d0e',
                 900: '#713f12',
               }
-            },
-            animation: {
-              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
             }
           }
         }
       }
     </script>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
-  }
-}
-</script>
-</head>
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://aistudiocdn.com/react@^19.2.0",
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+        "react/": "https://aistudiocdn.com/react@^19.2.0/",
+        "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
+      }
+    }
+    </script>
+  </head>
   <body class="bg-slate-950 text-slate-200 antialiased min-h-screen flex flex-col">
     <div id="root" class="flex-1 flex flex-col"></div>
+    <!-- Vercel/Vite 환경에서 React 앱을 실행하기 위한 핵심 줄 -->
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>
