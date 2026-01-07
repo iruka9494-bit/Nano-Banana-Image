@@ -1,9 +1,14 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Nano Banana Pro Studio</title>
+    <script>
+      // 브라우저에서 process.env 참조 에러(ReferenceError)를 방지하는 근본 대책
+      window.process = window.process || { env: {} };
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {

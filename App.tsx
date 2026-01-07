@@ -19,6 +19,7 @@ interface ErrorDetails {
 
 const App: React.FC = () => {
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
+  const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [error, setError] = useState<ErrorDetails | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
@@ -42,40 +43,26 @@ const App: React.FC = () => {
     referenceImages: []
   });
 
-  // API 키 유효성 확인 함수
-  const checkKey = useCallback(() => {
-    // 1. 이미 메모리에 있는지 확인
-    const envKey = (process.env as any).API_KEY;
-    if (envKey && envKey.length > 10) return true;
-
-    // 2. 로컬 스토리지 확인 (사용자 수동 입력분)
-    const savedKey = localStorage.getItem('USER_PROVIDED_API_KEY');
-    if (savedKey && savedKey.length > 10) {
-      (process.env as any).API_KEY = savedKey;
-      return true;
+  // 안전한 키 체크 함수 - Solely rely on window.aistudio.hasSelectedApiKey as per guidelines
+  const checkKeyStatus = useCallback(async () => {
+    try {
+      if (window.aistudio?.hasSelectedApiKey) {
+        return await window.aistudio.hasSelectedApiKey();
+      }
+    } catch (e) {
+      console.error("Key check failed silently:", e);
     }
-
     return false;
   }, []);
 
   useEffect(() => {
     const init = async () => {
-      if (checkKey()) {
-        setHasApiKey(true);
-      } else {
-        // AI Studio 플랫폼 API 체크 (플랫폼 환경인 경우)
-        try {
-          if (window.aistudio?.hasSelectedApiKey) {
-            const has = await window.aistudio.hasSelectedApiKey();
-            if (has) setHasApiKey(true);
-          }
-        } catch (e) {
-          console.warn("Platform check skipped");
-        }
-      }
+      const isKeyAvailable = await checkKeyStatus();
+      setHasApiKey(isKeyAvailable);
+      setIsInitializing(false); // 로딩 종료
     };
     init();
-  }, [checkKey]);
+  }, [checkKeyStatus]);
 
   const handleKeySelected = useCallback(() => {
     setHasApiKey(true);
@@ -94,11 +81,19 @@ const App: React.FC = () => {
         suggestion: "잠시 후 다시 시도해 주세요."
       };
 
-      if (msg.includes('403') || msg.includes('permission')) {
+      // Handle "Requested entity was not found" error by resetting key state as per guidelines
+      if (msg.includes('Requested entity was not found') || msg.includes('404')) {
+        setHasApiKey(false);
+        details = {
+          title: 'API 키 정보 만료',
+          message: '선택된 API 키 정보를 찾을 수 없습니다.',
+          suggestion: '다시 API 키를 선택해 주세요.'
+        };
+      } else if (msg.includes('403') || msg.includes('permission')) {
         details = {
           code: '403',
           title: '인증 권한 오류',
-          message: 'API 키가 유효하지 않거나 유료 결제가 활성화되지 않았습니다.',
+          message: 'API 키가 유효하지 않거나 유료 프로젝트가 아닙니다.',
           suggestion: '보안 관리 센터에서 키를 다시 등록해 주세요.'
         };
       }
@@ -235,6 +230,14 @@ const App: React.FC = () => {
   const resetFilters = () => { setFilterAspectRatio('ALL'); setFilterSize('ALL'); };
   const filteredImages = generatedImages.filter(img => (filterAspectRatio === 'ALL' || img.aspectRatio === filterAspectRatio) && (filterSize === 'ALL' || img.size === filterSize));
   const hasActiveFilters = filterAspectRatio !== 'ALL' || filterSize !== 'ALL';
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+        <div className="w-12 h-12 border-4 border-banana-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   if (!hasApiKey) return <ApiKeyGate onKeySelected={handleKeySelected} />;
 

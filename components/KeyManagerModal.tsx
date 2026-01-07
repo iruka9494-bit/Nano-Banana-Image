@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, ShieldCheck, Zap, RefreshCw, ExternalLink, ShieldAlert, CheckCircle2, ChevronRight, HardDrive, Lock, Activity, Key } from 'lucide-react';
+import { X, ShieldCheck, Zap, RefreshCw, ExternalLink, ShieldAlert, CheckCircle2, ChevronRight, HardDrive, Lock, Activity } from 'lucide-react';
 import { testApiKeyConnection } from '../services/geminiService';
 
 interface KeyManagerModalProps {
@@ -12,33 +12,19 @@ export const KeyManagerModal: React.FC<KeyManagerModalProps> = ({ onClose, onKey
   const [testResult, setTestResult] = useState<{ success: boolean; message: string; details?: string; latency?: number } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [showDiagnosticPopup, setShowDiagnosticPopup] = useState(false);
-  const [manualKey, setManualKey] = useState('');
-  const [isManualMode, setIsManualMode] = useState(false);
 
   const handleOpenSelect = async () => {
+    // Rely on platform-native window.aistudio.openSelectKey as per guidelines
     if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
       try {
         await window.aistudio.openSelectKey();
+        // Notify app of potential change - race condition handled by service layer initialization
         onKeyChange();
         setTestResult(null); 
       } catch (e) {
         console.error(e);
       }
-    } else {
-      setIsManualMode(true);
     }
-  };
-
-  const handleManualSave = () => {
-    if (manualKey.length < 10) {
-      alert("올바른 형식이 아닙니다.");
-      return;
-    }
-    localStorage.setItem('USER_PROVIDED_API_KEY', manualKey);
-    (process.env as any).API_KEY = manualKey;
-    onKeyChange();
-    setIsManualMode(false);
-    alert("API 키가 성공적으로 업데이트되었습니다.");
   };
 
   const runDiagnostic = async () => {
@@ -99,56 +85,36 @@ export const KeyManagerModal: React.FC<KeyManagerModalProps> = ({ onClose, onKey
               </div>
             </div>
 
-            {/* Manual Edit Mode */}
-            {isManualMode ? (
-              <div className="space-y-4 animate-fade-in bg-slate-950 p-6 rounded-2xl border border-slate-800 shadow-inner">
-                 <div className="flex items-center gap-2 text-banana-400 text-xs font-bold uppercase mb-2">
-                    <Key className="w-4 h-4" /> 수동 키 등록
-                 </div>
-                 <input 
-                    type="password"
-                    value={manualKey}
-                    onChange={(e) => setManualKey(e.target.value)}
-                    placeholder="새로운 API 키를 입력하세요"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:border-banana-500 outline-none"
-                 />
-                 <div className="flex gap-2">
-                    <button onClick={() => setIsManualMode(false)} className="flex-1 py-3 text-xs text-slate-400 hover:text-white transition-colors">취소</button>
-                    <button onClick={handleManualSave} className="flex-[2] py-3 bg-banana-500 text-slate-950 font-bold rounded-xl text-xs">저장 및 업데이트</button>
-                 </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <button 
-                  onClick={handleOpenSelect}
-                  className="w-full group flex items-center justify-between p-5 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-2xl transition-all"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 bg-banana-500/10 rounded-lg group-hover:scale-110 transition-transform">
-                      <RefreshCw className="w-5 h-5 text-banana-500" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm font-bold text-white">API 키 연결 및 갱신</p>
-                      <p className="text-xs text-slate-500">{window.aistudio ? '플랫폼 키 선택기 실행' : '수동 키 관리 (BYOK)'}</p>
-                    </div>
+            <div className="space-y-3">
+              <button 
+                onClick={handleOpenSelect}
+                className="w-full group flex items-center justify-between p-5 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-2xl transition-all"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-banana-500/10 rounded-lg group-hover:scale-110 transition-transform">
+                    <RefreshCw className="w-5 h-5 text-banana-500" />
                   </div>
-                  <ChevronRight className="w-5 h-5 text-slate-600 group-hover:translate-x-1 transition-transform" />
-                </button>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-white">API 키 연결 및 갱신</p>
+                    <p className="text-xs text-slate-500">플랫폼 키 선택기 실행</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-slate-600 group-hover:translate-x-1 transition-transform" />
+              </button>
 
-                <button 
-                  onClick={runDiagnostic}
-                  disabled={isTesting}
-                  className={`w-full flex items-center justify-center p-5 rounded-2xl font-bold transition-all gap-3 shadow-xl ${
-                    isTesting 
-                    ? 'bg-slate-800 text-slate-500 cursor-not-allowed' 
-                    : 'bg-gradient-to-r from-banana-500 to-orange-500 text-slate-950 hover:shadow-banana-500/20 active:scale-[0.98]'
-                  }`}
-                >
-                  {isTesting ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
-                  연결 테스트 및 실시간 진단
-                </button>
-              </div>
-            )}
+              <button 
+                onClick={runDiagnostic}
+                disabled={isTesting}
+                className={`w-full flex items-center justify-center p-5 rounded-2xl font-bold transition-all gap-3 shadow-xl ${
+                  isTesting 
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-banana-500 to-orange-500 text-slate-950 hover:shadow-banana-500/20 active:scale-[0.98]'
+                }`}
+              >
+                {isTesting ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
+                연결 테스트 및 실시간 진단
+              </button>
+            </div>
 
             {/* Footer */}
             <div className="pt-2 text-center">
