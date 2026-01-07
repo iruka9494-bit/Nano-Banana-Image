@@ -24,11 +24,9 @@ const App: React.FC = () => {
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [isKeyManagerOpen, setIsKeyManagerOpen] = useState(false);
   
-  // Filter states
   const [filterAspectRatio, setFilterAspectRatio] = useState<AspectRatio | 'ALL'>('ALL');
   const [filterSize, setFilterSize] = useState<ImageSize | 'ALL'>('ALL');
   
-  // Modal state
   const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
   const [editingReferenceId, setEditingReferenceId] = useState<string | null>(null);
 
@@ -44,36 +42,40 @@ const App: React.FC = () => {
     referenceImages: []
   });
 
-  // 초기 키 체크 및 로컬 저장소 동기화
+  // API 키 유효성 확인 함수
+  const checkKey = useCallback(() => {
+    // 1. 이미 메모리에 있는지 확인
+    const envKey = (process.env as any).API_KEY;
+    if (envKey && envKey.length > 10) return true;
+
+    // 2. 로컬 스토리지 확인 (사용자 수동 입력분)
+    const savedKey = localStorage.getItem('USER_PROVIDED_API_KEY');
+    if (savedKey && savedKey.length > 10) {
+      (process.env as any).API_KEY = savedKey;
+      return true;
+    }
+
+    return false;
+  }, []);
+
   useEffect(() => {
-    const checkInitialKey = async () => {
-      // 1. 환경 변수 확인 (Vercel 배포 시 설정된 키)
-      if (process.env.API_KEY && process.env.API_KEY.length > 5) {
+    const init = async () => {
+      if (checkKey()) {
         setHasApiKey(true);
-        return;
-      }
-
-      // 2. 로컬 스토리지 확인 (사용자가 직접 입력한 키)
-      const savedKey = localStorage.getItem('USER_PROVIDED_API_KEY');
-      if (savedKey) {
-        // SDK가 사용할 수 있도록 환경 변수 객체에 주입 (BYOK 모드)
-        (process.env as any).API_KEY = savedKey;
-        setHasApiKey(true);
-        return;
-      }
-
-      // 3. AI Studio 플랫폼 API 확인
-      try {
-        if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-          const hasKey = await window.aistudio.hasSelectedApiKey();
-          setHasApiKey(hasKey);
+      } else {
+        // AI Studio 플랫폼 API 체크 (플랫폼 환경인 경우)
+        try {
+          if (window.aistudio?.hasSelectedApiKey) {
+            const has = await window.aistudio.hasSelectedApiKey();
+            if (has) setHasApiKey(true);
+          }
+        } catch (e) {
+          console.warn("Platform check skipped");
         }
-      } catch (e) {
-        console.warn("AI Studio API check skipped:", e);
       }
     };
-    checkInitialKey();
-  }, []);
+    init();
+  }, [checkKey]);
 
   const handleKeySelected = useCallback(() => {
     setHasApiKey(true);
@@ -85,12 +87,7 @@ const App: React.FC = () => {
   };
 
   const handleError = (e: any) => {
-      let msg = "";
-      if (typeof e === 'string') msg = e;
-      else if (e.message) msg = e.message;
-      else if (e.error && e.error.message) msg = e.error.message;
-      else msg = JSON.stringify(e);
-
+      let msg = typeof e === 'string' ? e : (e.message || JSON.stringify(e));
       let details: ErrorDetails = {
         title: "오류가 발생했습니다",
         message: msg,
@@ -99,17 +96,12 @@ const App: React.FC = () => {
 
       if (msg.includes('403') || msg.includes('permission')) {
         details = {
-          code: '403 Forbidden',
+          code: '403',
           title: '인증 권한 오류',
-          message: '유효하지 않은 API 키이거나 해당 프로젝트에 결제가 활성화되어 있지 않습니다.',
-          suggestion: '보안 관리 센터에서 진단을 수행하거나 키를 다시 등록해 주세요.'
+          message: 'API 키가 유효하지 않거나 유료 결제가 활성화되지 않았습니다.',
+          suggestion: '보안 관리 센터에서 키를 다시 등록해 주세요.'
         };
-      } else if (msg.includes('429')) {
-        details = { code: '429', title: '사용량 한도 초과', message: '단시간에 너무 많은 요청을 보냈습니다.', suggestion: '잠시 후 다시 시도해 주세요.' };
-      } else if (msg.includes('SAFETY') || msg.includes('blocked')) {
-        details = { code: 'Safety Block', title: '안전 정책 차단', message: '콘텐츠 필터에 의해 생성이 거부되었습니다.', suggestion: '프롬프트를 수정하여 다시 시도해 주세요.' };
       }
-      
       setError(details);
   };
 
@@ -142,7 +134,7 @@ const App: React.FC = () => {
       setIsGenerating(false);
     }
   };
-  
+
   const handleGenerateCharacterSheet = async (sourceImage: GeneratedImage) => {
     setIsGenerating(true);
     setError(null);
